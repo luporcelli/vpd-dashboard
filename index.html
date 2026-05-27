@@ -321,10 +321,10 @@ select.fi{-webkit-appearance:none;text-align:left}
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────
 const DEFAULTS = {
-  PULSE_API_KEY: "",
-  PULSE_DEVICE_ID: "",
-  N8N_CFG_WEBHOOK_URL: "",   // webhook para enviar config a n8n
-  N8N_CTRL_WEBHOOK_URL: "",  // webhook para control manual
+  PULSE_API_KEY: "X3rtOdaDap6TF2nx9JzQyx65jtXLIwBXPSPTK98PGeRsLyr",
+  PULSE_DEVICE_ID: "24385",
+  N8N_CFG_WEBHOOK_URL: "https://n8n-production-a31b.up.railway.app/webhook/vpd-config",   // webhook para enviar config a n8n
+  N8N_CTRL_WEBHOOK_URL: "https://n8n-production-a31b.up.railway.app/webhook/vpd-control",  // webhook para control manual
   EXTRACTOR_DEVICE_ID: "eb3f3f71899e5e41e5g66y",
   HUMIDIFICADOR_DEVICE_ID: "eb8fed679bbe9ca2ffqate",
   LUZ_UMBRAL_DIA: 30,
@@ -706,11 +706,7 @@ cfgToForm();
 updateDeviceLabels();
 updateN8nBadge(CFG.N8N_CFG_WEBHOOK_URL ? 'pending' : null);
 
-if (!CFG.PULSE_API_KEY || !CFG.PULSE_DEVICE_ID) {
-  setTimeout(openSettings, 400);
-} else {
-  fetchPulse();
-}
+fetchPulse();
 setInterval(fetchPulse, 25000);
 </script>
 </body>
