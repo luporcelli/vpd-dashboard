@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>VPD Grow Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#222636;--border:#2d3148;
+  --accent:#7c6fe0;--accent2:#5dcaa5;--warn:#ef9f27;--danger:#e24b4a;
+  --text:#e2e8f0;--muted:#8892a4;
+}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;gap:1rem;height:56px;flex-wrap:wrap}
+header h1{font-size:17px;font-weight:600}
+.badge{font-size:11px;padding:3px 8px;border-radius:20px;background:#1d9e7522;color:#5dcaa5;border:1px solid #1d9e7544}
+.badge.offline{background:#e24b4a22;color:#f09595;border-color:#e24b4a44}
+.badge.syncing{background:#ef9f2722;color:#fac775;border-color:#ef9f2744;animation:blink 1s infinite}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 1.5rem;overflow-x:auto}
+.tab{padding:12px 18px;font-size:14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.content{padding:1.5rem;max-width:960px;margin:0 auto}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem}
+.card h3{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.5rem}
+.metric{font-size:32px;font-weight:700;line-height:1;margin-bottom:4px}
+.metric-sub{font-size:12px;color:var(--muted)}
+.vpd-bar-bg{height:10px;border-radius:5px;background:var(--surface2);position:relative;margin:1rem 0}
+.vpd-range{position:absolute;height:100%;border-radius:5px;background:#7c6fe033;border:1px solid #7c6fe066}
+.vpd-target{position:absolute;width:2px;height:100%;background:var(--accent)}
+.vpd-now{position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--accent);top:-2px;transform:translateX(-50%);transition:.5s}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500}
+.pill.ok{background:#1d9e7522;color:#5dcaa5;border:1px solid #1d9e7544}
+.pill.warn{background:#ef9f2722;color:#fac775;border:1px solid #ef9f2744}
+.pill.bad{background:#e24b4a22;color:#f09595;border:1px solid #e24b4a44}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.section-title{font-size:15px;font-weight:600;margin-bottom:1rem}
+.field-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.field-row:last-child{border-bottom:none}
+.field-label{font-size:13px;color:var(--muted)}
+.hint{font-size:11px;color:var(--muted);opacity:.7;margin-top:2px}
+.fi{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;font-size:14px;text-align:right}
+.fi:focus{outline:none;border-color:var(--accent)}
+.fi-num{width:90px}
+.fi-wide{width:220px;text-align:left}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);transition:.15s}
+.btn:hover{background:var(--border)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:#6b5ecf;border-color:#6b5ecf}
+.btn-success{background:#1d9e75;border-color:#1d9e75;color:#fff}
+.btn-success:hover{background:#17875f}
+.toggle{padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;flex:1;transition:.2s}
+.t-on{background:#1d9e75;color:#fff}
+.t-off{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.t-on:hover{background:#17875f}
+.t-off:hover{background:var(--border)}
+.log-row{font-size:12px;padding:7px 10px;border-radius:6px;background:var(--surface2);margin-bottom:5px;display:flex;justify-content:space-between;align-items:center}
+.c-on{color:#5dcaa5}.c-off{color:#f09595}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:#5dcaa5;animation:blink 2s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.mode-dia{background:#ef9f2715;color:#fac775;border:1px solid #ef9f2733}
+.mode-noche{background:#7c6fe015;color:#b8b0f0;border:1px solid #7c6fe033}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;z-index:999;transform:translateY(60px);opacity:0;transition:.3s;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{border-color:#1d9e75;color:#5dcaa5}
+.toast.err{border-color:#e24b4a;color:#f09595}
+.toast.info{border-color:#7c6fe0;color:#b8b0f0}
+.warn-banner{padding:10px 14px;background:#ef9f2711;border:1px solid #ef9f2733;border-radius:8px;font-size:12px;color:#fac775;margin-bottom:1rem}
+.device-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;display:flex;flex-direction:column;gap:12px}
+.sync-status{display:flex;align-items:center;gap:8px;font-size:12px;padding:8px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border)}
+.sync-status.synced{border-color:#1d9e7544;color:#5dcaa5}
+.sync-status.pending{border-color:#ef9f2744;color:#fac775}
+.sync-status.never{border-color:var(--border);color:var(--muted)}
+select.fi{-webkit-appearance:none;text-align:left}
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L8 8H3l3.5 5.5L4 20l8-3 8 3-2.5-6.5L21 8h-5L12 2z" stroke="#7c6fe0" stroke-width="1.8" stroke-linejoin="round"/></svg>
+  <h1>VPD Grow Dashboard</h1>
+  <div id="conn-badge" class="badge offline">● sin conexión</div>
+  <div id="n8n-sync-badge" class="badge offline" style="display:none">⟳ n8n</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <span id="last-update" style="font-size:11px;color:var(--muted)"></span>
+    <button class="btn" onclick="fetchPulse()" style="padding:6px 12px;font-size:12px">↺ Actualizar</button>
+    <button class="btn" onclick="openSettings()" style="padding:6px 12px;font-size:12px">⚙ Setup</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="tab('monitor',this)">📊 Monitor</div>
+  <div class="tab" onclick="tab('config',this)">⚙ Configuración</div>
+  <div class="tab" onclick="tab('control',this)">🎛 Control manual</div>
+</div>
+
+<div class="content">
+
+<!-- MONITOR -->
+<div id="tab-monitor">
+  <div class="grid4" style="margin-bottom:1rem">
+    <div class="card"><h3>Temperatura</h3><div class="metric" id="m-temp">--</div><div class="metric-sub">°C</div></div>
+    <div class="card"><h3>Humedad relativa</h3><div class="metric" id="m-hum">--</div><div class="metric-sub">% HR</div></div>
+    <div class="card"><h3>Luz</h3><div class="metric" id="m-luz">--</div><div class="metric-sub">lux</div></div>
+    <div class="card"><h3>CO₂</h3><div class="metric" id="m-co2">--</div><div class="metric-sub">ppm</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <h3 style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">VPD actual</h3>
+        <div id="vpd-mode" class="pill mode-dia">☀ Día</div>
+      </div>
+      <div id="vpd-status" class="pill ok"><div class="dot"></div> calculando...</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span id="m-vpd" style="font-size:42px;font-weight:700;color:var(--accent)">--</span>
+      <span style="color:var(--muted);font-size:18px">kPa</span>
+      <span id="vpd-range-label" style="font-size:12px;color:var(--muted);margin-left:8px"></span>
+    </div>
+    <div class="vpd-bar-bg">
+      <div id="vr" class="vpd-range" style="left:40%;width:20%"></div>
+      <div id="vt" class="vpd-target" style="left:55%"></div>
+      <div id="vn" class="vpd-now" style="left:10%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+      <span>0 — muy húmedo</span><span>óptimo</span><span>2 kPa — muy seco</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--muted)">
+      <div class="pulse-dot"></div><span>actualizando cada 25 s</span>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="section-title" style="font-size:13px;margin-bottom:.75rem">Estado dispositivos</div>
+      <div id="dev-status">
+        <div class="log-row"><span>💨 Extractor</span><span class="c-off">apagado</span></div>
+        <div class="log-row"><span>💧 Humidificador</span><span class="c-off">apagado</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title" style="font-size:13px;margin-bottom:.75rem">Últimas acciones</div>
+      <div id="action-log"><div style="font-size:12px;color:var(--muted);text-align:center;padding:1rem">Sin actividad aún</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIGURACION -->
+<div id="tab-config" style="display:none">
+
+  <!-- BANNER de estado de sincronización con n8n -->
+  <div id="sync-banner" class="sync-status never" style="margin-bottom:1rem">
+    <span id="sync-icon">⬤</span>
+    <span id="sync-text">Configurá la URL del webhook de n8n para sincronizar en tiempo real</span>
+  </div>
+
+  <div class="grid2" style="gap:1rem">
+
+    <div class="card">
+      <div class="section-title">☀ Día</div>
+      <div class="field-row"><div><div class="field-label">VPD mínimo</div><div class="hint">Activa extractor si VPD baja de aquí</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="0.1" class="fi fi-num" id="c-dm"><span style="font-size:12px;color:var(--muted)">kPa</span></div></div>
+      <div class="field-row"><div><div class="field-label">VPD máximo</div><div class="hint">Activa humidificador si VPD sube de aquí</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="0.1" class="fi fi-num" id="c-dM"><span style="font-size:12px;color:var(--muted)">kPa</span></div></div>
+      <div class="field-row"><div><div class="field-label">VPD objetivo</div><div class="hint">Apaga dispositivo al llegar aquí</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="0.1" class="fi fi-num" id="c-do"><span style="font-size:12px;color:var(--muted)">kPa</span></div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🌙 Noche</div>
+      <div class="field-row"><div><div class="field-label">VPD mínimo</div><div class="hint">Activa extractor si VPD baja de aquí</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="0.1" class="fi fi-num" id="c-nm"><span style="font-size:12px;color:var(--muted)">kPa</span></div></div>
+      <div class="field-row"><div><div class="field-label">VPD máximo</div><div class="hint">Activa humidificador si VPD sube de aquí</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="0.1" class="fi fi-num" id="c-nM"><span style="font-size:12px;color:var(--muted)">kPa</span></div></div>
+      <div class="field-row"><div><div class="field-label">VPD objetivo</div><div class="hint">Apaga dispositivo al llegar aquí</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="0.1" class="fi fi-num" id="c-no"><span style="font-size:12px;color:var(--muted)">kPa</span></div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🔆 Detección luz</div>
+      <div class="field-row"><div><div class="field-label">Umbral día (lux)</div><div class="hint">Por encima = modo día</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="1" class="fi fi-num" id="c-ldia"></div></div>
+      <div class="field-row"><div><div class="field-label">Umbral noche (lux)</div><div class="hint">Por debajo = modo noche</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="1" class="fi fi-num" id="c-lnoche"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">⏱ Pulsos automáticos</div>
+      <div class="field-row"><div><div class="field-label">Pulso humidificador</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="1" class="fi fi-num" id="c-ph"><span style="font-size:12px;color:var(--muted)">seg</span></div></div>
+      <div class="field-row"><div><div class="field-label">Pulso extractor</div></div><div style="display:flex;align-items:center;gap:6px"><input type="number" step="1" class="fi fi-num" id="c-pe"><span style="font-size:12px;color:var(--muted)">seg</span></div></div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <div class="section-title">🔑 Conexiones API</div>
+      <div class="field-row"><div class="field-label">Pulse API Key</div><input type="password" class="fi fi-wide" id="c-pkey"></div>
+      <div class="field-row"><div class="field-label">Pulse Device ID</div><input type="text" class="fi fi-wide" id="c-pid"></div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">N8N Webhook URL — Config</div>
+          <div class="hint">La app manda la config a este URL al guardar (ej: https://tu-n8n.com/webhook/vpd-config)</div>
+        </div>
+        <input type="text" class="fi" id="c-n8n-cfg" style="width:300px;text-align:left" placeholder="https://tu-n8n.com/webhook/vpd-config">
+      </div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">N8N Webhook URL — Control manual</div>
+          <div class="hint">Para encender/apagar desde la pestaña Control (ej: https://tu-n8n.com/webhook/vpd-control)</div>
+        </div>
+        <input type="text" class="fi" id="c-n8n-ctrl" style="width:300px;text-align:left" placeholder="https://tu-n8n.com/webhook/vpd-control">
+      </div>
+      <div class="field-row"><div class="field-label">Extractor Device ID</div><input type="text" class="fi fi-wide" id="c-eid"></div>
+      <div class="field-row"><div class="field-label">Humidificador Device ID</div><input type="text" class="fi fi-wide" id="c-hid"></div>
+    </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-top:1rem">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      💡 <strong style="color:var(--text)">Guardar</strong> aplica los cambios en el browser <em>y</em> los envía a n8n en tiempo real (si configuraste la URL del webhook).<br>
+      No necesitás entrar a n8n para cambiar el VPD objetivo u otros parámetros.
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn" onclick="importCfg()">📂 Importar JSON</button>
+      <button class="btn" onclick="exportCfg()">📤 Exportar JSON</button>
+      <button class="btn btn-primary" onclick="saveCfg()">💾 Guardar y sincronizar con n8n</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTROL MANUAL -->
+<div id="tab-control" style="display:none">
+  <div class="warn-banner">⚠ Bypass manual — los comandos se envían directamente a los dispositivos vía webhook de n8n, ignorando la lógica de VPD.</div>
+
+  <div id="n8n-warning" style="display:none;background:#e24b4a11;border:1px solid #e24b4a33;border-radius:8px;padding:12px 14px;font-size:12px;color:#f09595;margin-bottom:1rem">
+    ⚠ No hay una URL de webhook de control configurada. Andá a Configuración y pegá la URL del webhook de n8n para control manual.
+  </div>
+
+  <div class="grid2" style="margin-bottom:1.5rem">
+    <div class="device-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:15px;font-weight:600">💨 Extractor</div><div id="ext-txt" style="font-size:12px;color:var(--muted)">estado desconocido</div></div>
+        <div id="ext-badge" class="pill warn"><div class="dot"></div>---</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="toggle t-on" onclick="ctrl('extractor',true)">▶ Encender</button>
+        <button class="toggle t-off" onclick="ctrl('extractor',false)">■ Apagar</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">ID: <span id="ext-id-lbl">--</span></div>
+    </div>
+
+    <div class="device-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:15px;font-weight:600">💧 Humidificador</div><div id="hum-txt" style="font-size:12px;color:var(--muted)">estado desconocido</div></div>
+        <div id="hum-badge" class="pill warn"><div class="dot"></div>---</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="toggle t-on" onclick="ctrl('humidificador',true)">▶ Encender</button>
+        <button class="toggle t-off" onclick="ctrl('humidificador',false)">■ Apagar</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">ID: <span id="hum-id-lbl">--</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="section-title">⚡ Pulso manual</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:1rem">Encender un dispositivo por N segundos y apagarlo automáticamente.</div>
+    <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Dispositivo</div>
+        <select class="fi" id="pulse-dev" style="width:160px;text-align:left">
+          <option value="extractor">💨 Extractor</option>
+          <option value="humidificador">💧 Humidificador</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Duración (seg)</div>
+        <input type="number" class="fi fi-num" id="pulse-dur" value="60">
+      </div>
+      <button class="btn btn-primary" onclick="sendPulse()">⚡ Enviar pulso</button>
+    </div>
+    <div id="pulse-cd" style="margin-top:10px;font-size:13px;color:var(--muted);display:none"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="font-size:13px;margin-bottom:.75rem">Log de acciones manuales</div>
+    <div id="manual-log" style="max-height:220px;overflow-y:auto">
+      <div style="font-size:12px;color:var(--muted);text-align:center;padding:1rem">Sin acciones aún</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="setup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;max-width:460px;width:90%;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+      <h2 style="font-size:16px;font-weight:600">Primera configuración</h2>
+      <button class="btn" onclick="closeSettings()" style="padding:4px 10px;font-size:13px">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:1rem">Pegá tus credenciales para empezar. Se guardan sólo en tu navegador.</div>
+    <div class="field-row"><div class="field-label">Pulse API Key</div><input type="password" class="fi fi-wide" id="s-pkey"></div>
+    <div class="field-row"><div class="field-label">Pulse Device ID</div><input type="text" class="fi fi-wide" id="s-pid"></div>
+    <div class="field-row">
+      <div>
+        <div class="field-label">N8N Webhook — Config</div>
+        <div class="hint">Para sincronizar parámetros en tiempo real</div>
+      </div>
+      <input type="text" class="fi" id="s-n8n-cfg" style="width:200px;text-align:left" placeholder="…/webhook/vpd-config">
+    </div>
+    <div class="field-row">
+      <div>
+        <div class="field-label">N8N Webhook — Control</div>
+        <div class="hint">Para encender/apagar dispositivos</div>
+      </div>
+      <input type="text" class="fi" id="s-n8n-ctrl" style="width:200px;text-align:left" placeholder="…/webhook/vpd-control">
+    </div>
+    <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeSettings()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSetup()">Guardar y conectar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────
+const DEFAULTS = {
+  PULSE_API_KEY: "",
+  PULSE_DEVICE_ID: "",
+  N8N_CFG_WEBHOOK_URL: "",   // webhook para enviar config a n8n
+  N8N_CTRL_WEBHOOK_URL: "",  // webhook para control manual
+  EXTRACTOR_DEVICE_ID: "eb3f3f71899e5e41e5g66y",
+  HUMIDIFICADOR_DEVICE_ID: "eb8fed679bbe9ca2ffqate",
+  LUZ_UMBRAL_DIA: 30,
+  LUZ_UMBRAL_NOCHE: 10,
+  DIA_VPD_MIN: 0.8,
+  DIA_VPD_MAX: 1.2,
+  DIA_VPD_OBJ: 1.1,
+  NOCHE_VPD_MIN: 0.6,
+  NOCHE_VPD_MAX: 1.1,
+  NOCHE_VPD_OBJ: 0.9,
+  PULSO_HUMIDIFICADOR_SEG: 180,
+  PULSO_EXTRACTOR_SEG: 600,
+};
+
+let CFG = { ...DEFAULTS };
+let liveData = null;
+let manualLog = [];
+let pulseTimer = null;
+let lastSyncTime = null;
+
+function loadCfg() {
+  try {
+    const s = localStorage.getItem('vpd-cfg');
+    if (s) CFG = { ...DEFAULTS, ...JSON.parse(s) };
+    // migrar campo viejo si existe
+    if (CFG.N8N_WEBHOOK_URL && !CFG.N8N_CTRL_WEBHOOK_URL) {
+      CFG.N8N_CTRL_WEBHOOK_URL = CFG.N8N_WEBHOOK_URL;
+      delete CFG.N8N_WEBHOOK_URL;
+    }
+  } catch {}
+}
+
+function persistCfg() {
+  localStorage.setItem('vpd-cfg', JSON.stringify(CFG));
+}
+
+// ─── UI HELPERS ───────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  setTimeout(() => el.className = 'toast', 3200);
+}
+
+function tab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['monitor','config','control'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t === name ? 'block' : 'none';
+  });
+  if (name === 'control') updateN8nWarning();
+  if (name === 'config') updateSyncBanner();
+}
+
+function updateN8nWarning() {
+  document.getElementById('n8n-warning').style.display = CFG.N8N_CTRL_WEBHOOK_URL ? 'none' : 'block';
+}
+
+function updateSyncBanner() {
+  const banner = document.getElementById('sync-banner');
+  const icon   = document.getElementById('sync-icon');
+  const text   = document.getElementById('sync-text');
+  if (!CFG.N8N_CFG_WEBHOOK_URL) {
+    banner.className = 'sync-status never';
+    icon.textContent = '⬤'; text.textContent = 'Configurá el webhook de n8n para sincronizar en tiempo real';
+  } else if (lastSyncTime) {
+    banner.className = 'sync-status synced';
+    icon.textContent = '✓'; text.textContent = `Último sync con n8n: ${lastSyncTime}`;
+  } else {
+    banner.className = 'sync-status pending';
+    icon.textContent = '○'; text.textContent = 'Webhook configurado — guardá para sincronizar';
+  }
+}
+
+function updateN8nBadge(state) {
+  const b = document.getElementById('n8n-sync-badge');
+  if (!CFG.N8N_CFG_WEBHOOK_URL) { b.style.display = 'none'; return; }
+  b.style.display = 'inline-flex';
+  if (state === 'syncing') { b.className = 'badge syncing'; b.textContent = '⟳ n8n'; }
+  else if (state === 'ok') { b.className = 'badge'; b.textContent = '✓ n8n'; }
+  else { b.className = 'badge offline'; b.textContent = '✕ n8n'; }
+}
+
+// ─── SETUP MODAL ─────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('s-pkey').value = CFG.PULSE_API_KEY;
+  document.getElementById('s-pid').value = CFG.PULSE_DEVICE_ID;
+  document.getElementById('s-n8n-cfg').value = CFG.N8N_CFG_WEBHOOK_URL;
+  document.getElementById('s-n8n-ctrl').value = CFG.N8N_CTRL_WEBHOOK_URL;
+  document.getElementById('setup-overlay').style.display = 'flex';
+}
+function closeSettings() {
+  document.getElementById('setup-overlay').style.display = 'none';
+}
+function saveSetup() {
+  CFG.PULSE_API_KEY      = document.getElementById('s-pkey').value.trim();
+  CFG.PULSE_DEVICE_ID    = document.getElementById('s-pid').value.trim();
+  CFG.N8N_CFG_WEBHOOK_URL  = document.getElementById('s-n8n-cfg').value.trim();
+  CFG.N8N_CTRL_WEBHOOK_URL = document.getElementById('s-n8n-ctrl').value.trim();
+  persistCfg();
+  closeSettings();
+  toast('✓ Conectado');
+  updateN8nBadge(CFG.N8N_CFG_WEBHOOK_URL ? 'pending' : null);
+  fetchPulse();
+}
+
+// ─── CONFIG FORM ──────────────────────────────────────────────
+function cfgToForm() {
+  document.getElementById('c-dm').value = CFG.DIA_VPD_MIN;
+  document.getElementById('c-dM').value = CFG.DIA_VPD_MAX;
+  document.getElementById('c-do').value = CFG.DIA_VPD_OBJ;
+  document.getElementById('c-nm').value = CFG.NOCHE_VPD_MIN;
+  document.getElementById('c-nM').value = CFG.NOCHE_VPD_MAX;
+  document.getElementById('c-no').value = CFG.NOCHE_VPD_OBJ;
+  document.getElementById('c-ldia').value = CFG.LUZ_UMBRAL_DIA;
+  document.getElementById('c-lnoche').value = CFG.LUZ_UMBRAL_NOCHE;
+  document.getElementById('c-ph').value = CFG.PULSO_HUMIDIFICADOR_SEG;
+  document.getElementById('c-pe').value = CFG.PULSO_EXTRACTOR_SEG;
+  document.getElementById('c-pkey').value = CFG.PULSE_API_KEY;
+  document.getElementById('c-pid').value = CFG.PULSE_DEVICE_ID;
+  document.getElementById('c-n8n-cfg').value = CFG.N8N_CFG_WEBHOOK_URL;
+  document.getElementById('c-n8n-ctrl').value = CFG.N8N_CTRL_WEBHOOK_URL;
+  document.getElementById('c-eid').value = CFG.EXTRACTOR_DEVICE_ID;
+  document.getElementById('c-hid').value = CFG.HUMIDIFICADOR_DEVICE_ID;
+}
+
+async function saveCfg() {
+  CFG.DIA_VPD_MIN    = +document.getElementById('c-dm').value;
+  CFG.DIA_VPD_MAX    = +document.getElementById('c-dM').value;
+  CFG.DIA_VPD_OBJ    = +document.getElementById('c-do').value;
+  CFG.NOCHE_VPD_MIN  = +document.getElementById('c-nm').value;
+  CFG.NOCHE_VPD_MAX  = +document.getElementById('c-nM').value;
+  CFG.NOCHE_VPD_OBJ  = +document.getElementById('c-no').value;
+  CFG.LUZ_UMBRAL_DIA   = +document.getElementById('c-ldia').value;
+  CFG.LUZ_UMBRAL_NOCHE = +document.getElementById('c-lnoche').value;
+  CFG.PULSO_HUMIDIFICADOR_SEG = +document.getElementById('c-ph').value;
+  CFG.PULSO_EXTRACTOR_SEG     = +document.getElementById('c-pe').value;
+  CFG.PULSE_API_KEY  = document.getElementById('c-pkey').value.trim();
+  CFG.PULSE_DEVICE_ID = document.getElementById('c-pid').value.trim();
+  CFG.N8N_CFG_WEBHOOK_URL  = document.getElementById('c-n8n-cfg').value.trim();
+  CFG.N8N_CTRL_WEBHOOK_URL = document.getElementById('c-n8n-ctrl').value.trim();
+  CFG.EXTRACTOR_DEVICE_ID     = document.getElementById('c-eid').value.trim();
+  CFG.HUMIDIFICADOR_DEVICE_ID = document.getElementById('c-hid').value.trim();
+  persistCfg();
+  updateDeviceLabels();
+  if (liveData) renderMonitor(liveData);
+
+  // Sincronizar con n8n si hay webhook configurado
+  if (CFG.N8N_CFG_WEBHOOK_URL) {
+    await syncToN8n();
+  } else {
+    toast('✓ Configuración guardada (sin webhook n8n)');
+  }
+  updateSyncBanner();
+}
+
+// ─── SYNC A N8N ──────────────────────────────────────────────
+async function syncToN8n() {
+  updateN8nBadge('syncing');
+  const payload = {
+    PULSE_API_KEY:              CFG.PULSE_API_KEY,
+    PULSE_DEVICE_ID:            CFG.PULSE_DEVICE_ID,
+    LUZ_UMBRAL_DIA:             CFG.LUZ_UMBRAL_DIA,
+    LUZ_UMBRAL_NOCHE:           CFG.LUZ_UMBRAL_NOCHE,
+    LUZ_MINUTOS_CONFIRMACION:   0,
+    DIA_VPD_MIN:                CFG.DIA_VPD_MIN,
+    DIA_VPD_MAX:                CFG.DIA_VPD_MAX,
+    DIA_VPD_OBJ:                CFG.DIA_VPD_OBJ,
+    NOCHE_VPD_MIN:              CFG.NOCHE_VPD_MIN,
+    NOCHE_VPD_MAX:              CFG.NOCHE_VPD_MAX,
+    NOCHE_VPD_OBJ:              CFG.NOCHE_VPD_OBJ,
+    PULSO_HUMIDIFICADOR_SEG:    CFG.PULSO_HUMIDIFICADOR_SEG,
+    PULSO_EXTRACTOR_SEG:        CFG.PULSO_EXTRACTOR_SEG,
+    EXTRACTOR_DEVICE_ID:        CFG.EXTRACTOR_DEVICE_ID,
+    HUMIDIFICADOR_DEVICE_ID:    CFG.HUMIDIFICADOR_DEVICE_ID,
+  };
+  try {
+    const res = await fetch(CFG.N8N_CFG_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    lastSyncTime = new Date().toLocaleTimeString('es-AR');
+    updateN8nBadge('ok');
+    toast('✓ Guardado y sincronizado con n8n');
+  } catch (e) {
+    updateN8nBadge('err');
+    toast('Guardado en browser. Error enviando a n8n: ' + e.message, 'err');
+  }
+}
+
+function exportCfg() {
+  const out = {
+    PULSE_API_KEY: CFG.PULSE_API_KEY,
+    PULSE_DEVICE_ID: CFG.PULSE_DEVICE_ID,
+    LUZ_UMBRAL_DIA: CFG.LUZ_UMBRAL_DIA,
+    LUZ_UMBRAL_NOCHE: CFG.LUZ_UMBRAL_NOCHE,
+    LUZ_MINUTOS_CONFIRMACION: 0,
+    DIA_VPD_MIN: CFG.DIA_VPD_MIN,
+    DIA_VPD_MAX: CFG.DIA_VPD_MAX,
+    DIA_VPD_OBJ: CFG.DIA_VPD_OBJ,
+    NOCHE_VPD_MIN: CFG.NOCHE_VPD_MIN,
+    NOCHE_VPD_MAX: CFG.NOCHE_VPD_MAX,
+    NOCHE_VPD_OBJ: CFG.NOCHE_VPD_OBJ,
+    PULSO_HUMIDIFICADOR_SEG: CFG.PULSO_HUMIDIFICADOR_SEG,
+    PULSO_EXTRACTOR_SEG: CFG.PULSO_EXTRACTOR_SEG,
+    EXTRACTOR_DEVICE_ID: CFG.EXTRACTOR_DEVICE_ID,
+    HUMIDIFICADOR_DEVICE_ID: CFG.HUMIDIFICADOR_DEVICE_ID,
+  };
+  const b = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a'); a.href = u; a.download = 'vpd-config.json'; a.click();
+  URL.revokeObjectURL(u);
+  toast('JSON exportado');
+}
+
+function importCfg() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try { Object.assign(CFG, JSON.parse(ev.target.result)); persistCfg(); cfgToForm(); toast('✓ Importado'); }
+      catch { toast('Error al leer JSON', 'err'); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
+// ─── PULSE API ────────────────────────────────────────────────
+async function fetchPulse() {
+  if (!CFG.PULSE_API_KEY || !CFG.PULSE_DEVICE_ID) {
+    openSettings(); return;
+  }
+  try {
+    const res = await fetch(
+      `https://api.pulsegrow.com/devices/${CFG.PULSE_DEVICE_ID}/recent-data`,
+      { headers: { 'x-api-key': CFG.PULSE_API_KEY } }
+    );
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    liveData = data;
+    renderMonitor(data);
+    document.getElementById('conn-badge').className = 'badge';
+    document.getElementById('conn-badge').textContent = '● conectado';
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString('es-AR');
+  } catch (e) {
+    document.getElementById('conn-badge').className = 'badge offline';
+    document.getElementById('conn-badge').textContent = '● sin conexión';
+    toast('Error Pulse: ' + e.message, 'err');
+  }
+}
+
+function calcVPD(t, rh) {
+  const svp = 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
+  return +((1 - rh / 100) * svp).toFixed(3);
+}
+
+function renderMonitor(data) {
+  const temp = data.temperatureC;
+  const hum  = data.humidityRh;
+  const luz  = data.lightLux ?? 0;
+  const co2  = data.co2Ppm ?? data.co2 ?? null;
+
+  document.getElementById('m-temp').textContent = temp != null ? temp.toFixed(1) : '--';
+  document.getElementById('m-hum').textContent  = hum  != null ? hum.toFixed(1)  : '--';
+  document.getElementById('m-luz').textContent  = luz  != null ? Math.round(luz) : '--';
+  document.getElementById('m-co2').textContent  = co2  != null ? Math.round(co2) : '--';
+
+  if (temp != null && hum != null) {
+    const vpd  = calcVPD(temp, hum);
+    const modo = luz >= CFG.LUZ_UMBRAL_DIA ? 'dia' : 'noche';
+    const vMin = modo === 'dia' ? CFG.DIA_VPD_MIN  : CFG.NOCHE_VPD_MIN;
+    const vMax = modo === 'dia' ? CFG.DIA_VPD_MAX  : CFG.NOCHE_VPD_MAX;
+    const vObj = modo === 'dia' ? CFG.DIA_VPD_OBJ  : CFG.NOCHE_VPD_OBJ;
+    const MAX_BAR = 2.0;
+    const pct = v => Math.min(100, Math.max(0, (v / MAX_BAR) * 100));
+
+    document.getElementById('m-vpd').textContent = vpd.toFixed(3);
+    document.getElementById('vpd-range-label').textContent = `rango: ${vMin} – ${vMax} kPa | objetivo: ${vObj}`;
+    document.getElementById('vr').style.cssText = `left:${pct(vMin)}%;width:${pct(vMax)-pct(vMin)}%`;
+    document.getElementById('vt').style.left = pct(vObj) + '%';
+    document.getElementById('vn').style.left = pct(vpd)  + '%';
+
+    const modeEl = document.getElementById('vpd-mode');
+    modeEl.className = 'pill ' + (modo === 'dia' ? 'mode-dia' : 'mode-noche');
+    modeEl.textContent = modo === 'dia' ? '☀ Día' : '🌙 Noche';
+
+    const st = document.getElementById('vpd-status');
+    if (vpd < vMin) {
+      st.className = 'pill bad'; st.innerHTML = '<div class="dot"></div> bajo — extractor';
+    } else if (vpd > vMax) {
+      st.className = 'pill warn'; st.innerHTML = '<div class="dot"></div> alto — humidificador';
+    } else {
+      st.className = 'pill ok'; st.innerHTML = '<div class="dot"></div> en rango ✓';
+    }
+  }
+}
+
+// ─── TUYA CONTROL (via n8n webhook) ───────────────────────────
+async function ctrl(device, state) {
+  if (!CFG.N8N_CTRL_WEBHOOK_URL) {
+    toast('Configurá la URL del webhook de control de n8n primero', 'err');
+    updateN8nWarning(); return;
+  }
+  setBadge(device, 'loading');
+  try {
+    const res = await fetch(CFG.N8N_CTRL_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device, state })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setBadge(device, state ? 'on' : 'off');
+    addManualLog(device, state);
+    toast(`✓ ${device === 'extractor' ? 'Extractor' : 'Humidificador'} ${state ? 'encendido' : 'apagado'}`);
+  } catch (e) {
+    setBadge(device, 'unknown');
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+function setBadge(device, state) {
+  const badgeId = device === 'extractor' ? 'ext-badge' : 'hum-badge';
+  const textId  = device === 'extractor' ? 'ext-txt'   : 'hum-txt';
+  const b = document.getElementById(badgeId);
+  const t = document.getElementById(textId);
+  const s = { on: ['pill ok','<div class="dot"></div> encendido','encendido manualmente'],
+               off: ['pill bad','<div class="dot"></div> apagado','apagado manualmente'],
+               loading: ['pill warn','<div class="dot"></div> enviando...','esperando respuesta'],
+               unknown: ['pill warn','<div class="dot"></div> ---','estado desconocido'] }[state] || ['pill warn','---',''];
+  b.className = s[0]; b.innerHTML = s[1]; t.textContent = s[2];
+}
+
+function addManualLog(device, state) {
+  const time = new Date().toLocaleTimeString('es-AR');
+  manualLog.unshift({ device, state, time });
+  if (manualLog.length > 30) manualLog.pop();
+  const c = document.getElementById('manual-log');
+  c.innerHTML = manualLog.map(l =>
+    `<div class="log-row">
+      <span>${l.device === 'extractor' ? '💨' : '💧'} ${l.device} — <span class="${l.state ? 'c-on' : 'c-off'}">${l.state ? 'ENCENDIDO' : 'APAGADO'}</span></span>
+      <span style="font-size:11px;color:var(--muted)">${l.time}</span>
+    </div>`
+  ).join('');
+}
+
+function sendPulse() {
+  const device = document.getElementById('pulse-dev').value;
+  const dur = parseInt(document.getElementById('pulse-dur').value) || 60;
+  if (pulseTimer) { clearInterval(pulseTimer); pulseTimer = null; }
+  ctrl(device, true);
+  let rem = dur;
+  const cd = document.getElementById('pulse-cd');
+  cd.style.display = 'block';
+  cd.textContent = `⏱ Apagando ${device} en ${rem}s...`;
+  pulseTimer = setInterval(() => {
+    rem--;
+    cd.textContent = `⏱ Apagando ${device} en ${rem}s...`;
+    if (rem <= 0) {
+      clearInterval(pulseTimer); pulseTimer = null;
+      ctrl(device, false);
+      cd.textContent = '✓ Pulso completado';
+      setTimeout(() => { cd.style.display = 'none'; }, 3000);
+    }
+  }, 1000);
+}
+
+function updateDeviceLabels() {
+  document.getElementById('ext-id-lbl').textContent = CFG.EXTRACTOR_DEVICE_ID || '--';
+  document.getElementById('hum-id-lbl').textContent = CFG.HUMIDIFICADOR_DEVICE_ID || '--';
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+loadCfg();
+cfgToForm();
+updateDeviceLabels();
+updateN8nBadge(CFG.N8N_CFG_WEBHOOK_URL ? 'pending' : null);
+
+if (!CFG.PULSE_API_KEY || !CFG.PULSE_DEVICE_ID) {
+  setTimeout(openSettings, 400);
+} else {
+  fetchPulse();
+}
+setInterval(fetchPulse, 25000);
+</script>
+</body>
+</html>

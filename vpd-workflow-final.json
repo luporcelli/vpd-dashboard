@@ -1,0 +1,316 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 25
+            }
+          ]
+        }
+      },
+      "id": "9d4a8680-9d5e-4799-9e50-0bdced7a05c5",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vpd-config",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Webhook Config",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "webhookId": "vpd-config"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json;\nconst staticData = $getWorkflowStaticData('global');\n\n// Guardar todos los campos de configuracion que lleguen\nconst campos = [\n  'PULSE_API_KEY','PULSE_DEVICE_ID',\n  'LUZ_UMBRAL_DIA','LUZ_UMBRAL_NOCHE','LUZ_MINUTOS_CONFIRMACION',\n  'DIA_VPD_MIN','DIA_VPD_MAX','DIA_VPD_OBJ',\n  'NOCHE_VPD_MIN','NOCHE_VPD_MAX','NOCHE_VPD_OBJ',\n  'PULSO_HUMIDIFICADOR_SEG','PULSO_EXTRACTOR_SEG',\n  'ESPERA_ENTRE_PULSOS_MIN','TIEMPO_OBSERVACION_MIN',\n  'EMAIL_NOTIFICACIONES',\n  'EXTRACTOR_DEVICE_ID','HUMIDIFICADOR_DEVICE_ID'\n];\n\ncampos.forEach(campo => {\n  if (body[campo] !== undefined) {\n    staticData[campo] = body[campo];\n  }\n});\nstaticData.config_actualizada = new Date().toISOString();\n\nconsole.log('Config actualizada desde dashboard:', JSON.stringify(staticData));\nreturn [{ json: { ok: true, mensaje: 'Configuracion guardada en n8n', timestamp: staticData.config_actualizada } }];"
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Guardar Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.item.json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+              { "name": "Access-Control-Allow-Headers", "value": "Content-Type" }
+            ]
+          }
+        }
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [448, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vpd-control",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "name": "Webhook Control Manual",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 400],
+      "webhookId": "vpd-control"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = $input.item.json.body || $input.item.json;\nconst staticData = $getWorkflowStaticData('global');\n\nconst EXTRACTOR_DEVICE_ID     = staticData.EXTRACTOR_DEVICE_ID     || 'eb3f3f71899e5e41e5g66y';\nconst HUMIDIFICADOR_DEVICE_ID = staticData.HUMIDIFICADOR_DEVICE_ID || 'eb8fed679bbe9ca2ffqate';\nconst CLIENT_ID = 'rkpuumd4n53ygdhewc54';\nconst SECRET    = '84c0dad687e8491796db4cb0aa32e591';\n\nconst device = body.device;\nconst state  = body.state;\nconst device_id = device === 'extractor' ? EXTRACTOR_DEVICE_ID : HUMIDIFICADOR_DEVICE_ID;\n\nconst ts = Date.now().toString();\nconst contentHash = crypto.createHash('sha256').update('').digest('hex');\nconst str = CLIENT_ID + ts + 'GET\\n' + contentHash + '\\n\\n/v1.0/token?grant_type=1';\nconst sign = crypto.createHmac('sha256', SECRET).update(str).digest('hex').toUpperCase();\n\nreturn [{ json: {\n  device_id,\n  device_nombre: device,\n  state,\n  TUYA_CLIENT_ID: CLIENT_ID,\n  TUYA_SECRET: SECRET,\n  tuya_ts: ts,\n  tuya_sign: sign\n}}];"
+      },
+      "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
+      "name": "Preparar Control Manual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://openapi.tuyaus.com/v1.0/token?grant_type=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "client_id",    "value": "={{$json.TUYA_CLIENT_ID}}" },
+            { "name": "sign_method",  "value": "HMAC-SHA256" },
+            { "name": "t",            "value": "={{$json.tuya_ts}}" },
+            { "name": "sign",         "value": "={{$json.tuya_sign}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
+      "name": "Token Tuya (Manual)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [448, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst tokenData = $input.item.json;\nconst ctrl = $('Preparar Control Manual').item.json;\n\nif (!tokenData.success) throw new Error('Token Tuya fallido: ' + JSON.stringify(tokenData));\n\nconst CLIENT_ID   = ctrl.TUYA_CLIENT_ID;\nconst SECRET      = ctrl.TUYA_SECRET;\nconst tuya_token  = tokenData.result.access_token;\nconst BODY        = JSON.stringify({ commands: [{ code: 'switch_1', value: ctrl.state }] });\nconst ts          = Date.now().toString();\nconst path        = `/v1.0/devices/${ctrl.device_id}/commands`;\nconst bodyHash    = crypto.createHash('sha256').update(BODY).digest('hex');\nconst str         = CLIENT_ID + tuya_token + ts + 'POST\\n' + bodyHash + '\\n\\n' + path;\nconst sign        = crypto.createHmac('sha256', SECRET).update(str).digest('hex').toUpperCase();\n\nreturn [{ json: {\n  device_nombre: ctrl.device_nombre,\n  state: ctrl.state,\n  url: `https://openapi.tuyaus.com${path}`,\n  body: BODY,\n  header_client_id: CLIENT_ID,\n  header_token: tuya_token,\n  header_t: ts,\n  header_sign: sign\n}}];"
+      },
+      "id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
+      "name": "Firmar Comando Manual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.url}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "client_id",     "value": "={{$json.header_client_id}}" },
+            { "name": "sign_method",   "value": "HMAC-SHA256" },
+            { "name": "access_token",  "value": "={{$json.header_token}}" },
+            { "name": "t",             "value": "={{$json.header_t}}" },
+            { "name": "sign",          "value": "={{$json.header_sign}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4567-bcde-678901234567",
+      "name": "Enviar Tuya (Manual)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [896, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $json.success ?? true, device: $('Preparar Control Manual').item.json.device_nombre, state: $('Preparar Control Manual').item.json.state }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "c9d0e1f2-a3b4-5678-cdef-789012345678",
+      "name": "Responder Control",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// Usar config guardada por el dashboard, o los defaults si nunca se configuro\nconst cfg = {\n  PULSE_API_KEY:              staticData.PULSE_API_KEY              ?? 'X3rtOdaDap6TF2nx9JzQyx65jtXLIwBXPSPTK98PGeRsLyr',\n  PULSE_DEVICE_ID:            staticData.PULSE_DEVICE_ID            ?? '24385',\n  LUZ_UMBRAL_DIA:             staticData.LUZ_UMBRAL_DIA             ?? 30,\n  LUZ_UMBRAL_NOCHE:           staticData.LUZ_UMBRAL_NOCHE           ?? 10,\n  LUZ_MINUTOS_CONFIRMACION:   staticData.LUZ_MINUTOS_CONFIRMACION   ?? 0,\n  DIA_VPD_MIN:                staticData.DIA_VPD_MIN                ?? 0.8,\n  DIA_VPD_MAX:                staticData.DIA_VPD_MAX                ?? 1.2,\n  DIA_VPD_OBJ:                staticData.DIA_VPD_OBJ                ?? 1.1,\n  NOCHE_VPD_MIN:              staticData.NOCHE_VPD_MIN              ?? 0.6,\n  NOCHE_VPD_MAX:              staticData.NOCHE_VPD_MAX              ?? 1.1,\n  NOCHE_VPD_OBJ:              staticData.NOCHE_VPD_OBJ              ?? 0.9,\n  PULSO_HUMIDIFICADOR_SEG:    staticData.PULSO_HUMIDIFICADOR_SEG    ?? 180,\n  PULSO_EXTRACTOR_SEG:        staticData.PULSO_EXTRACTOR_SEG        ?? 600,\n  ESPERA_ENTRE_PULSOS_MIN:    staticData.ESPERA_ENTRE_PULSOS_MIN    ?? 0,\n  TIEMPO_OBSERVACION_MIN:     staticData.TIEMPO_OBSERVACION_MIN     ?? 0,\n  EMAIL_NOTIFICACIONES:       staticData.EMAIL_NOTIFICACIONES       ?? 'rodrigo.caricato@gmail.com',\n  EXTRACTOR_DEVICE_ID:        staticData.EXTRACTOR_DEVICE_ID        ?? 'eb3f3f71899e5e41e5g66y',\n  HUMIDIFICADOR_DEVICE_ID:    staticData.HUMIDIFICADOR_DEVICE_ID    ?? 'eb8fed679bbe9ca2ffqate',\n  SWITCHES_EXTRA:             staticData.SWITCHES_EXTRA             ?? []\n};\n\nconst fuente = staticData.config_actualizada ? `dashboard (${staticData.config_actualizada})` : 'defaults hardcoded';\nconsole.log(`CONFIGURACION cargada desde: ${fuente}`);\n\nreturn [{ json: cfg }];"
+      },
+      "id": "785444ac-86a6-46b3-96a0-2002da90b8e1",
+      "name": "CONFIGURACION",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [208, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.pulsegrow.com/devices/{{$json.PULSE_DEVICE_ID}}/recent-data",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$json.PULSE_API_KEY}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c3dbccf3-09c5-44d8-996e-bdbc96a2967e",
+      "name": "Leer Pulse Zero",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [432, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('CONFIGURACION').item.json;\nconst data = $input.item.json;\n\nconst temperatura = data.temperatureC;\nconst humedad = data.humidityRh;\nconst luz = data.lightLux ?? 0;\n\nif (temperatura === undefined || temperatura === null) throw new Error('No se encontro temperatureC.');\nif (humedad === undefined || humedad === null) throw new Error('No se encontro humidityRh.');\n\nfunction calcSVP(tempC) {\n  return 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));\n}\nconst svp_actual = calcSVP(temperatura);\nconst vpd_actual = parseFloat(((1 - humedad / 100) * svp_actual).toFixed(3));\n\nconst staticData = $getWorkflowStaticData('global');\nconst ahora = Date.now();\n\nconst modo_actual = luz >= config.LUZ_UMBRAL_DIA ? 'dia' : 'noche';\n\nconst VPD_MIN = modo_actual === 'dia' ? config.DIA_VPD_MIN : config.NOCHE_VPD_MIN;\nconst VPD_MAX = modo_actual === 'dia' ? config.DIA_VPD_MAX : config.NOCHE_VPD_MAX;\nconst VPD_OBJ = modo_actual === 'dia' ? config.DIA_VPD_OBJ : config.NOCHE_VPD_OBJ;\n\nlet humidificador_prendido_en = staticData.humidificador_prendido_en !== undefined ? staticData.humidificador_prendido_en : null;\nlet extractor_prendido_en     = staticData.extractor_prendido_en !== undefined ? staticData.extractor_prendido_en : null;\nlet historial                 = staticData.historial || [];\n\nlet extractor_accion     = null;\nlet humidificador_accion = null;\nlet notificaciones       = [];\n\nif (extractor_prendido_en !== null && vpd_actual >= VPD_OBJ) {\n  extractor_accion      = false;\n  extractor_prendido_en = null;\n  const ev = { dispositivo: 'Extractor', accion: 'APAGADO', vpd: vpd_actual, temp: temperatura, hr: humedad, modo: modo_actual, timestamp: new Date(ahora).toISOString() };\n  historial.push(ev); notificaciones.push(ev);\n}\n\nif (humidificador_prendido_en !== null && vpd_actual <= VPD_OBJ) {\n  humidificador_accion      = false;\n  humidificador_prendido_en = null;\n  const ev = { dispositivo: 'Humidificador', accion: 'APAGADO', vpd: vpd_actual, temp: temperatura, hr: humedad, modo: modo_actual, timestamp: new Date(ahora).toISOString() };\n  historial.push(ev); notificaciones.push(ev);\n}\n\nconst ambos_apagados        = humidificador_prendido_en === null && extractor_prendido_en === null;\nconst nadie_acaba_de_actuar = humidificador_accion === null && extractor_accion === null;\n\nif (ambos_apagados && nadie_acaba_de_actuar) {\n  const vpd_alto = vpd_actual > VPD_MAX;\n  const vpd_bajo = vpd_actual < VPD_MIN;\n\n  if (vpd_alto) {\n    humidificador_accion      = true;\n    humidificador_prendido_en = ahora;\n    const ev = { dispositivo: 'Humidificador', accion: 'ENCENDIDO', vpd: vpd_actual, temp: temperatura, hr: humedad, modo: modo_actual, timestamp: new Date(ahora).toISOString() };\n    historial.push(ev); notificaciones.push(ev);\n  } else if (vpd_bajo) {\n    extractor_accion      = true;\n    extractor_prendido_en = ahora;\n    const ev = { dispositivo: 'Extractor', accion: 'ENCENDIDO', vpd: vpd_actual, temp: temperatura, hr: humedad, modo: modo_actual, timestamp: new Date(ahora).toISOString() };\n    historial.push(ev); notificaciones.push(ev);\n  }\n}\n\nif (historial.length > 100) historial = historial.slice(-100);\n\nstaticData.humidificador_prendido_en = humidificador_prendido_en;\nstaticData.extractor_prendido_en     = extractor_prendido_en;\nstaticData.historial                 = historial;\n\nconsole.log(`MODO: ${modo_actual} | Luz: ${luz} | Temp: ${temperatura}C | HR: ${humedad}% | VPD: ${vpd_actual} kPa`);\nconsole.log(`Rango: ${VPD_MIN}-${VPD_MAX} | Objetivo corte: ${VPD_OBJ}`);\n\nreturn [{ json: {\n  PULSE_API_KEY:           config.PULSE_API_KEY,\n  PULSE_DEVICE_ID:         config.PULSE_DEVICE_ID,\n  EXTRACTOR_DEVICE_ID:     config.EXTRACTOR_DEVICE_ID,\n  HUMIDIFICADOR_DEVICE_ID: config.HUMIDIFICADOR_DEVICE_ID,\n  SWITCHES_EXTRA:          config.SWITCHES_EXTRA,\n  TUYA_CLIENT_ID:          'rkpuumd4n53ygdhewc54',\n  TUYA_SECRET:             '84c0dad687e8491796db4cb0aa32e591',\n  EMAIL_NOTIFICACIONES:    config.EMAIL_NOTIFICACIONES,\n  modo_actual,\n  temperatura,\n  humedad,\n  luz,\n  vpd_actual,\n  vpd_objetivo: VPD_OBJ,\n  vpd_min:      VPD_MIN,\n  vpd_max:      VPD_MAX,\n  extractor_accion,\n  humidificador_accion,\n  notificaciones,\n  historial,\n  switches_extra_acciones: []\n}}];"
+      },
+      "id": "78c3a149-819e-425b-b55a-20a65412d61a",
+      "name": "Logica de Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [656, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst data = $input.item.json;\nconst CLIENT_ID = data.TUYA_CLIENT_ID;\nconst SECRET = data.TUYA_SECRET;\nconst ts = Date.now().toString();\nconst contentHash = crypto.createHash('sha256').update('').digest('hex');\nconst str = CLIENT_ID + ts + 'GET\\n' + contentHash + '\\n\\n/v1.0/token?grant_type=1';\nconst sign = crypto.createHmac('sha256', SECRET).update(str).digest('hex').toUpperCase();\nreturn [{ json: { ...data, tuya_ts: ts, tuya_sign: sign }}];"
+      },
+      "id": "87d08821-63c9-464d-a4ac-47a04ea47ac6",
+      "name": "Preparar Firma Tuya",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://openapi.tuyaus.com/v1.0/token?grant_type=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "client_id",   "value": "={{$json.TUYA_CLIENT_ID}}" },
+            { "name": "sign_method", "value": "HMAC-SHA256" },
+            { "name": "t",           "value": "={{$json.tuya_ts}}" },
+            { "name": "sign",        "value": "={{$json.tuya_sign}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f43bbfcd-54f1-4d5e-886c-2eba220284e9",
+      "name": "Obtener Token Tuya",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1088, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst tokenData = $input.item.json;\nconst config = $('Logica de Decision').item.json;\n\nif (!tokenData.success) {\n  throw new Error('Error obteniendo token Tuya: ' + JSON.stringify(tokenData));\n}\n\nconst CLIENT_ID = config.TUYA_CLIENT_ID;\nconst SECRET = config.TUYA_SECRET;\nconst tuya_token = tokenData.result.access_token;\n\nconst comandos = [];\nif (config.extractor_accion !== null) {\n  comandos.push({ device_id: config.EXTRACTOR_DEVICE_ID, nombre: 'Extractor', estado: config.extractor_accion });\n}\nif (config.humidificador_accion !== null) {\n  comandos.push({ device_id: config.HUMIDIFICADOR_DEVICE_ID, nombre: 'Humidificador', estado: config.humidificador_accion });\n}\n\nif (comandos.length === 0) {\n  return [{ json: { sin_accion: true, vpd_actual: config.vpd_actual, modo: config.modo_actual, mensaje: 'VPD en rango, sin comandos' } }];\n}\n\nconst requests = comandos.map(cmd => {\n  const BODY = JSON.stringify({ commands: [{ code: 'switch_1', value: cmd.estado }] });\n  const ts = Date.now().toString();\n  const path = `/v1.0/devices/${cmd.device_id}/commands`;\n  const bodyHash = crypto.createHash('sha256').update(BODY).digest('hex');\n  const str = CLIENT_ID + tuya_token + ts + 'POST\\n' + bodyHash + '\\n\\n' + path;\n  const sign = crypto.createHmac('sha256', SECRET).update(str).digest('hex').toUpperCase();\n  return {\n    nombre: cmd.nombre,\n    estado: cmd.estado ? 'ENCENDIDO' : 'APAGADO',\n    url: `https://openapi.tuyaus.com${path}`,\n    body: BODY,\n    header_client_id: CLIENT_ID,\n    header_token: tuya_token,\n    header_t: ts,\n    header_sign: sign\n  };\n});\n\nreturn requests.map(r => ({ json: r }));"
+      },
+      "id": "f52e45d4-2e2d-40a7-abb0-dedb0879532e",
+      "name": "Preparar Comandos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1312, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.url}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "client_id",    "value": "={{$json.header_client_id}}" },
+            { "name": "sign_method",  "value": "HMAC-SHA256" },
+            { "name": "access_token", "value": "={{$json.header_token}}" },
+            { "name": "t",            "value": "={{$json.header_t}}" },
+            { "name": "sign",         "value": "={{$json.header_sign}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "options": {}
+      },
+      "id": "aad5c3b4-b8c1-454b-89dd-ec9206fe2203",
+      "name": "Enviar Comandos Tuya",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 0]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "CONFIGURACION", "type": "main", "index": 0 }]]
+    },
+    "Webhook Config": {
+      "main": [[{ "node": "Guardar Config", "type": "main", "index": 0 }]]
+    },
+    "Guardar Config": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    },
+    "Webhook Control Manual": {
+      "main": [[{ "node": "Preparar Control Manual", "type": "main", "index": 0 }]]
+    },
+    "Preparar Control Manual": {
+      "main": [[{ "node": "Token Tuya (Manual)", "type": "main", "index": 0 }]]
+    },
+    "Token Tuya (Manual)": {
+      "main": [[{ "node": "Firmar Comando Manual", "type": "main", "index": 0 }]]
+    },
+    "Firmar Comando Manual": {
+      "main": [[{ "node": "Enviar Tuya (Manual)", "type": "main", "index": 0 }]]
+    },
+    "Enviar Tuya (Manual)": {
+      "main": [[{ "node": "Responder Control", "type": "main", "index": 0 }]]
+    },
+    "CONFIGURACION": {
+      "main": [[{ "node": "Leer Pulse Zero", "type": "main", "index": 0 }]]
+    },
+    "Leer Pulse Zero": {
+      "main": [[{ "node": "Logica de Decision", "type": "main", "index": 0 }]]
+    },
+    "Logica de Decision": {
+      "main": [[{ "node": "Preparar Firma Tuya", "type": "main", "index": 0 }]]
+    },
+    "Preparar Firma Tuya": {
+      "main": [[{ "node": "Obtener Token Tuya", "type": "main", "index": 0 }]]
+    },
+    "Obtener Token Tuya": {
+      "main": [[{ "node": "Preparar Comandos", "type": "main", "index": 0 }]]
+    },
+    "Preparar Comandos": {
+      "main": [[{ "node": "Enviar Comandos Tuya", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "965e9a0e75f6f486643d8f8acfa5a63dc40c95c5a91f76395d7021d3384a53df"
+  }
+}
